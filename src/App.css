@@ -36,3 +36,16 @@
     transform: rotate(360deg);
   }
 }
+
+.bordered-checkbox input[type="checkbox"] {
+  border: 2px solid #007bff;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.bordered-checkbox input[type="checkbox"]:checked {
+  background-color: #007bff;
+}
