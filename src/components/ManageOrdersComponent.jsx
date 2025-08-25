@@ -86,7 +86,7 @@ function ManageOrdersComponent() {
     return (
         <Container className="my-4">
             <div className="d-flex justify-content-between align-items-center mb-4">
-                <h3 className="fw-bold text-primary">Manage Orders</h3>
+                <h3 className="fw-bold">Manage Orders</h3>
             </div>
 
             {totalPages > 1 && (

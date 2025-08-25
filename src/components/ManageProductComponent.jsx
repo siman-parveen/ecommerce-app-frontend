@@ -133,7 +133,7 @@ const ManageProductComponent = () => {
   return (
     <Container className="my-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h3 className="fw-bold text-primary">Manage Products</h3>
+        <h3 className="fw-bold">Manage Products</h3>
         <Button variant="success" onClick={() => handleOpenModal('add')}><i className="bi bi-plus-lg me-1"></i>Add Product</Button>
       </div>
 

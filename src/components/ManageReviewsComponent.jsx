@@ -36,7 +36,7 @@ function ManageReviewsComponent() {
     const currentReviews = productReviews.slice(indexOfFirstProduct, indexOfLastProduct);
 
     const totalPages = Math.ceil(productReviews.length / reviewsPerPage);
-    
+
     useEffect(() => {
         if (!isAuthenticated) {
             navigate('/login');
@@ -118,7 +118,7 @@ function ManageReviewsComponent() {
     return (
         <Container className="my-4">
             <div className="d-flex justify-content-between align-items-center mb-4">
-                <h3 className="fw-bold text-primary">Manage Reviews</h3>
+                <h3 className="fw-bold">Manage Reviews</h3>
                 {!isAdmin && <Button variant="success" onClick={handleOpenModalForAddReview}><i className="bi bi-plus-lg me-1"></i>Add Review</Button>}
             </div>
 
