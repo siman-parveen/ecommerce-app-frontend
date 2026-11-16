@@ -1,27 +1,64 @@
 import axios from "axios"
 
-const API_CALLER = 'http://localhost:8080/api';
+const API_ROOT = 'http://localhost:8080';
+const API_CALLER = API_ROOT + '/api';
+axios.defaults.withCredentials = true;
+let csrfToken = null;
+
+const ensureCsrfToken = async () => {
+    if (csrfToken === null) {
+        await apicall_retrieveCsrfToken();
+    }
+}
 
 /* USERS API CALL */
 
 export const apicall_retrieveAllUsers = async () => {
-    return await axios.get(API_CALLER + '/user/all');
+    return await axios.get(API_CALLER + '/admin/users');
 }
 
-export const apicall_retrieveUserByUserId = async (userExternalId) => {
-    return await axios.get(API_CALLER + `/user/${userExternalId}`);
+export const apicall_retrieveUserByUserId = async (userExternalId, isAdmin = false) => {
+    const endpoint = isAdmin ? `/admin/users/${userExternalId}` : `/user/${userExternalId}`;
+    return await axios.get(API_CALLER + endpoint);
 }
 
 export const apicall_registerUser = async (userRequestDTO) => {
+    await ensureCsrfToken();
     return await axios.post(API_CALLER + '/user/signup', userRequestDTO);
 }
 
 export const apicall_loginuser = async (userRequestDTO) => {
+    await ensureCsrfToken();
     return await axios.post(API_CALLER + '/user/login', userRequestDTO);
 }
 
+export const apicall_logout = async () => {
+    await ensureCsrfToken();
+    try {
+        return await axios.post(API_ROOT + '/api/logout');
+    } finally {
+        csrfToken = null;
+        delete axios.defaults.headers.common["X-CSRF-TOKEN"];
+    }
+}
+
+export const apicall_retrieveSession = async () => {
+    return await axios.get(API_CALLER + '/auth/session');
+}
+
+export const apicall_retrieveCsrfToken = async () => {
+    const response = await axios.get(API_CALLER + '/auth/csrf');
+    csrfToken = response.data.token;
+    axios.defaults.headers.common["X-CSRF-TOKEN"] = csrfToken;
+    return response;
+}
+
 export const apicall_updateUser = async (userExternalId, userRequestDTO)  => {
-        return await axios.patch(API_CALLER + `/user/${userExternalId}`, userRequestDTO);
+    return await axios.patch(API_CALLER + `/user/${userExternalId}`, userRequestDTO);
+}
+
+export const apicall_retrieveProductsBroughtByUser = async (userExternalId)  => {
+    return await axios.get(API_CALLER + `/user/${userExternalId}/products`);
 }
 
 /* USER ADDRESS API CALL */
@@ -67,7 +104,7 @@ export const apicall_deleteProduct = async (productId) => {
 /* PAYMENT API CALL */
 
 export const apicall_retrievePaymentByOrderId = async (orderExternalId) => {
-    return await axios.get(API_CALLER + `/api/user/order/${orderExternalId}/payment`);
+    return await axios.get(API_CALLER + `/user/order/${orderExternalId}/payment`);
 }
 
 
@@ -78,7 +115,7 @@ export const apicall_retrieveAllOrders = async () =>{
 }
 
 export const apicall_retrieveOrderByOrderExternalId = async (orderExternalId) => {
-    return await axios.get(API_CALLER + `/api/user/order/${orderExternalId}`);
+    return await axios.get(API_CALLER + `/user/order/${orderExternalId}`);
 }
 
 export const apicall_retrieveOrdersGivenByUser = async (userExternalId) => {
@@ -86,19 +123,19 @@ export const apicall_retrieveOrdersGivenByUser = async (userExternalId) => {
 }
 
 export const apicall_createOrder = async (userExternalId, orderRequestDto) => {
-    return await axios.post(API_CALLER +  `/user/${userExternalId}/order`, orderRequestDto);
+    return await axios.post(API_CALLER +  `/user/order`, orderRequestDto);
 }
 
 export const apicall_updateOrderStatusByAdmin = async (orderExternalId, status) => {
-    //return await axios.patch(API_CALLER +  `/user/${userExternalId}/order`);
+    return await axios.patch(API_CALLER +  `/admin/order/${orderExternalId}/update/status?status=${status}`);
 }
 
 export const apicall_cancelOrder = async (orderExternalId) => {
-    return await axios.patch(API_CALLER + `/api/user/order/${orderExternalId}`);
+    return await axios.patch(API_CALLER + `/user/order/${orderExternalId}`);
 }
 
 export const apicall_deleteOrder = async (orderExternalId) => {
-    return await axios.delete(API_CALLER + `/api/user/order/${orderExternalId}`);
+    return await axios.delete(API_CALLER + `/user/order/${orderExternalId}`);
 }
 
 
@@ -128,12 +165,16 @@ export const apicall_addReview = async (reviewDto) => {
 }
 
 export const apicall_updateReview = async (reviewExternalId, reviewDto) => {
-    return await axios.post(API_CALLER + `/user/product/review/${reviewExternalId}`, reviewDto);
+    return await axios.patch(API_CALLER + `/user/product/review/${reviewExternalId}`, reviewDto);
 
 }
 
+export const apicall_retrieveReviewByExternalId = async (reviewExternalId) => {
+    return await axios.get(API_CALLER + `/public/product/review/${reviewExternalId}`);
+}
+
 export const apicall_deleteReviewByExternalId = async (reviewExternalId) => {
-    return await axios.get(API_CALLER + `/user/product/review/${reviewExternalId}`)
+    return await axios.delete(API_CALLER + `/user/product/review/${reviewExternalId}`)
 }
 
 

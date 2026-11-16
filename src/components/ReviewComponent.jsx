@@ -4,7 +4,7 @@ import DeleteModalComponent from "./modal/DeleteModalComponent";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../security/AuthContext";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { apicall_deleteReviewByExternalId, apicall_updateReview } from "../api/ApiCall";
+import { apicall_deleteReviewByExternalId, apicall_retrieveReviewByExternalId, apicall_updateReview, retrieveErrorMessage, retrieveMessage } from "../api/ApiCall";
 import ToastComponent from "./ToastComponent";
 
 function ReviewComponent() {
@@ -22,17 +22,13 @@ function ReviewComponent() {
     useEffect(() => {
           if(!isAuthenticated){
               navigate('/login');
+          } else {
+                if(isFetchRequired) {
+                    setIsFetchRequired(false);
+                    retrieveReviewByExternalId();
+                }
           }
       });
-
-    const reviewDTO = {
-        userExternalId: "",
-        productExternalId: "",
-        productName: "",
-        customerName: "",
-        rating: 0,
-        comment: ""
-    };
 
     const [productReview, setProductReview] = useState({});
 
@@ -70,9 +66,41 @@ function ReviewComponent() {
         
     // }
 
+    const retrieveReviewByExternalId = async () => {
+        try{
+            const response = await apicall_retrieveReviewByExternalId(reviewExternalId);
+            console.log(response);
+            if(response.data.success) {
+                setProductReview(response.data.responseData);
+            } else {
+                setToastType("danger");
+                setShowToast(true);
+                setToastMessage(retrieveMessage(response));
+            } 
+           
+        }catch(error) {
+            setToastMessage(retrieveErrorMessage(error));
+            setShowToast(true);
+            setToastType("danger");
+        }   
+    }
+
     const editReview = async () => {
         try{
-            const result = await apicall_updateReview(reviewExternalId, reviewDTO);
+            const reviewDTO = {
+                userExternalId,
+                productExternalId: productReview.productExternalId,
+                rating: productReview.rating,
+                comment: productReview.comment
+            };
+            const response = await apicall_updateReview(reviewExternalId, reviewDTO);
+            if(response.data.success) {
+                setToastType("success");
+            } else {
+                setToastType("danger")
+            }
+            setShowToast(true)
+            setToastMessage(retrieveMessage(response));
             setShowModal(false);
             setModalMode("");
             setIsFetchRequired(true);
@@ -83,29 +111,25 @@ function ReviewComponent() {
     }
 
     const handleDelete = () => {
-        //setSelectedReviewExternalId(reviewExternalId)
         setDeleteModalShow(true);
     }
 
     const deleteReviewById = async () => {
         try{
-            setDeleteModalShow(false);
-            const result = await apicall_deleteReviewByExternalId(reviewExternalId);
-            //setSelectedReviewExternalId(null);
-            setProductReview({});
-            navigate(-1);
+            const response = await apicall_deleteReviewByExternalId(reviewExternalId);
+            if(response.data.success) {
+                setDeleteModalShow(false);
+                setProductReview({});
+                navigate(-1);
+            } else {
+                setToastType("danger");
+                setToastMessage(retrieveMessage(response));
+                setShowToast(true);
+            }
         }catch(error) {
-            setMessage(error?.code === "ERR_NETWORK" ? error?.message : error?.response?.data?.message);
+            setMessage(retrieveErrorMessage(error));
             setIsFetchRequired(false);
         }
-    }
-
-    const deleteReview = () => {
-        apicall_deleteReviewByExternalId();
-        //setProductReview(productReviews.filter(review => review.id !== productReview.id));
-        setDeleteModalShow(false);
-        setProductReview({});
-        //navigate(-1);
     }
     
 

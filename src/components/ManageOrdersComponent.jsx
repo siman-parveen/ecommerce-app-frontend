@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../security/AuthContext";
 import { apicall_retrieveAllOrders, apicall_retrieveOrdersGivenByUser, retrieveErrorMessage, retrieveMessage } from "../api/ApiCall";
 import MessageComponent from "./MessageComponent";
+import ToastComponent from "./ToastComponent";
 
 function ManageOrdersComponent() {
 
@@ -16,6 +17,8 @@ function ManageOrdersComponent() {
     const [orders, setOrders] = useState([]);
 
     const [message, setMessage] = useState(null);
+    const [showToast, setShowToast] = useState(false);
+    const [toastType, setToastType] = useState("info");
 
     const [currentPage, setCurrentPage] = useState(1);
     const ordersPerPage = 6;
@@ -26,13 +29,12 @@ function ManageOrdersComponent() {
 
     const totalPages = Math.ceil(orders.length / ordersPerPage);
 
-    //const paginationItems = [];
-
     useEffect(() => {
         if(!isAuthenticated){
             navigate('/login');
         } else {
             if(isFetchRequired) {
+                setIsFetchRequired(false);
                 retrieveOrders();
                 //setPagination();
             }
@@ -59,21 +61,10 @@ function ManageOrdersComponent() {
             }            
         }catch(error) {
             setMessage(retrieveErrorMessage(error));
-        }finally{
-            setIsFetchRequired(false);
-        }
-        
+            setShowToast(true);
+            setToastType("danger");
+        } 
     }
-
-    // const setPagination = () => {
-    //     for (let page = 1; page <= totalPages; page++) {
-    //         paginationItems.push(
-    //             <Pagination.Item key={page} active={page === currentPage} onClick={() => setCurrentPage(page)}>
-    //                 {page}
-    //             </Pagination.Item>
-    //         );
-    //     }
-    // }
 
     const viewSelectedOrder = (selectedOrderId) => {
         navigate(`/user/orders/${selectedOrderId}`);
@@ -112,20 +103,23 @@ function ManageOrdersComponent() {
                     <Col className="text-center text-muted py-5">No orders found.</Col>
                 ) : (
                     currentOrders.map(order => (
-                        <Col md={6} lg={4} className="mb-4" key={order.orderId}>
+                        <Col md={6} lg={4} className="mb-4" key={order.orderExternalId}>
                             <Card className="shadow-sm h-100 border-0">
                                 <Card.Body>
-                                    <Card.Title className="mb-2 text-success fw-bold">Order# {order.orderId}</Card.Title>
-                                    {isAdmin && <Card.Text className="mb-1 text-secondary">Ordered By: <span className="fw-semibold">{order.customer}</span></Card.Text>}
+                                    <Card.Title className="mb-2 text-success fw-bold">Order# {order.orderExternalId}</Card.Title>
+                                    {isAdmin && <Card.Text className="mb-1 text-secondary">Ordered By: <span className="fw-semibold">{order.customerName}</span></Card.Text>}
                                     <Card.Text className="mb-2"><span className={`badge ${order.status === 'Delivered' ? 'bg-success' : 'bg-warning text-dark'}`}>{order.status}</span></Card.Text>
-                                    {!isAdmin && <Button variant="outline-primary" className="me-2" onClick={() => viewSelectedOrder(order.orderId)}><i className="bi bi-eye me-1"></i>View</Button>}
-                                    {isAdmin && <Button variant="outline-warning" className="me-2" onClick={() => viewAndManageSelectedOrder(order.orderId)}><i className="bi bi-tools me-1"></i>View & Manage</Button>}
+                                    {isAdmin ? 
+                                    <Button variant="outline-warning" className="me-2" onClick={() => viewAndManageSelectedOrder(order.orderExternalId)}><i className="bi bi-tools me-1"></i>View & Manage</Button>
+                                    :
+                                    <Button variant="outline-primary" className="me-2" onClick={() => viewSelectedOrder(order.orderExternalId)}><i className="bi bi-eye me-1"></i>View</Button>}
                                 </Card.Body>
                             </Card>
                         </Col>
-                    ))
-                )}
+                    )))
+                }
             </Row>
+
         </Container>
     );
 }

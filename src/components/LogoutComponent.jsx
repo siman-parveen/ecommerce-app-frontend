@@ -2,10 +2,13 @@ import { useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Container, Alert } from "react-bootstrap";
 import { AuthContext } from "../security/AuthContext";
+import { retrieveErrorMessage } from "../api/ApiCall";
+import { useState } from "react";
 
 function LogoutComponent() {
   const navigate = useNavigate();
   const { onLogout, isAuthenticated } = useContext(AuthContext);
+  const [logoutError, setLogoutError] = useState(null);
   
   useEffect(() => {
       if(!isAuthenticated){
@@ -15,16 +18,22 @@ function LogoutComponent() {
 
 
   useEffect(() => {
-    //authContext.onLogout?.();
-    setTimeout(() => {
-      navigate("/login");
-      onLogout?.();
+    const timeout = setTimeout(async () => {
+      try {
+        await onLogout?.();
+        navigate("/login");
+      } catch (error) {
+        setLogoutError(retrieveErrorMessage(error));
+      }
     }, 1500);
+    return () => clearTimeout(timeout);
   }, [onLogout, navigate]);
 
   return (
     <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: "80vh" }}>
-      <Alert variant="info">You have been logged out. Redirecting...</Alert>
+      {logoutError
+        ? <Alert variant="danger">Unable to log out: {logoutError}</Alert>
+        : <Alert variant="info">Logging out...</Alert>}
     </Container>
   );
 }

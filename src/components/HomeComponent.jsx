@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { apicall_retrieveAllProducts, retrieveErrorMessage, retrieveMessage } from "../api/ApiCall";
 import { FaRegStar, FaStar, FaStarHalfAlt } from "react-icons/fa";
 import MessageComponent from "./MessageComponent";
+import ToastComponent from "./ToastComponent";
 
 
 function HomeComponent() {
@@ -22,19 +23,6 @@ function HomeComponent() {
     const currentProducts = products.slice(indexOfFirstProduct, indexOfLastProduct);
 
     const totalPages = Math.ceil(products.length / productsPerPage);
-
-    // const paginationItems = [];
-    // for (let page = 1; page <= totalPages; page++) {
-    //     paginationItems.push(
-    //     <Pagination.Item
-    //         key={page}
-    //         active={page === currentPage}
-    //         onClick={() => setCurrentPage(page)}
-    //     >
-    //         {page}
-    //     </Pagination.Item>
-    //     );
-    // }
 
     useEffect(() => {
         if(isFetchRequired) {
@@ -90,7 +78,11 @@ function HomeComponent() {
                             <Card className="h-100">
                                 <Card.Body>
                                     <Card.Title>{product.productName}</Card.Title>
-                                    <Card.Text>{product.description}</Card.Text>
+                                    <Card.Text>
+                                        {product.description && product.description.length > 40
+                                            ? product.description.substring(0, 40) + '...'
+                                            : product.description}
+                                    </Card.Text>
                                     <Card.Text><strong>Price:</strong> ${product.price}</Card.Text>
                                     <Card.Text><strong>Stock:</strong> {product.stock}</Card.Text>
                                     <Card.Text>
@@ -118,4 +110,4 @@ function HomeComponent() {
 };
 
 
-    export default HomeComponent;
+export default HomeComponent;

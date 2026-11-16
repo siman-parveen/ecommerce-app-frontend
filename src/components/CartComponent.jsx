@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../security/AuthContext";
 import { apicall_addQuantityForCartItem, apicall_removeProductFromCart, apicall_removeQuantityForCartItem, apicall_retrieveCartItemsForUserCart, retrieveErrorMessage, retrieveMessage } from "../api/ApiCall";
 import MessageComponent from "./MessageComponent";
+import ToastComponent from "./ToastComponent";
 
 const CartComponent = () => {
 
@@ -18,6 +19,10 @@ const CartComponent = () => {
   const [cartItems, setCartItems] = useState([]);
 
   const [message, setMessage] = useState(null);
+
+  const [showToast, setShowToast] = useState(false);
+  const [toastType, setToastType] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
 
 
   useEffect(() => {
@@ -61,6 +66,7 @@ const CartComponent = () => {
         setCartItems(items);
         setSelectedTotal(response.data.responseData.totalAmount);
       } else {
+        setCartItems([]);
         setMessage(retrieveMessage(response));
       }
     }catch(error) {
@@ -87,26 +93,46 @@ const CartComponent = () => {
 
   const updateQuantity = async (cartItemExternalId, mode) => {
     try {
+      let response = null;
       if(mode === "remove") {
-        await apicall_removeQuantityForCartItem(cartItemExternalId, {"quantity" : 1});
+        response = await apicall_removeQuantityForCartItem(cartItemExternalId, {"quantity" : 1});
       } else if (mode === "add") {
-        await apicall_addQuantityForCartItem(cartItemExternalId, {"quantity" : 1});
+        response = await apicall_addQuantityForCartItem(cartItemExternalId, {"quantity" : 1});
       }
-      setIsFetchRequired(true);
+       if(response.data.success) {
+        setIsFetchRequired(true);
+        setToastType("success");
+       }else{
+        setToastType("danger");
+       }
+      setToastMessage(retrieveMessage(response));
+      setShowToast(true);
+      
     } catch(error) {
-      setMessage(retrieveErrorMessage(error));
-      setIsFetchRequired(false);
+      setToastMessage(retrieveErrorMessage(error));
+      //setIsFetchRequired(false);
+      setToastType("danger");
+      setShowToast(true);
     }
 
   };
 
   const removeItem = async (cartItemExternalId) => {
     try {
-      await apicall_removeProductFromCart(cartItemExternalId);
-      setIsFetchRequired(true);
+      const response = await apicall_removeProductFromCart(cartItemExternalId);
+      if(response.data.success) {
+        setIsFetchRequired(true);
+        setToastType("success");
+       }else{
+        setToastType("danger");
+       }
+      setToastMessage(retrieveMessage(response));
+      setShowToast(true);
     } catch(error) {
-      setMessage(retrieveErrorMessage(error));
-      setIsFetchRequired(false);
+      setToastMessage(retrieveErrorMessage(error));
+      //setIsFetchRequired(false);
+      setToastType("danger");
+      setShowToast(true);
     }
 
   };
@@ -167,7 +193,9 @@ const CartComponent = () => {
 
       </Row>
 
-    </Container>
+      <ToastComponent isShow={showToast} toastType={toastType} message={toastMessage} onToastClose={() => setShowToast(false)} />
+
+      </Container>
   );
 }
 

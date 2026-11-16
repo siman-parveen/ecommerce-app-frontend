@@ -1,9 +1,9 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Button, Form, Container, Card, ToggleButtonGroup, ToggleButton } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import ToastComponent from "./ToastComponent";
 import { AuthContext } from "../security/AuthContext";
-import { retrieveErrorMessage, retrieveMessage } from "../api/ApiCall";
+import { retrieveErrorMessage } from "../api/ApiCall";
 
 function AuthComponent() {
 
@@ -20,6 +20,12 @@ function AuthComponent() {
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
+  useEffect(() => {
+    if (authContext.isAuthenticated) {
+      navigate('/products');
+    }
+  });
 
   const actionsForLogin = async () => {
 
@@ -57,10 +63,6 @@ function AuthComponent() {
       setToastType("danger");
       setAuthMessage(retrieveErrorMessage(err));
     }
-  }
-
-  function isAuthenticated() {
-    return authContext.isLoggedIn(formData.emailId, formData.password);
   }
 
   function onToastClose() {

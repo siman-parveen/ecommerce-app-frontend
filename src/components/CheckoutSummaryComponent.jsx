@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useState } from "react";
 import { Container, Row, Col, Card, Button, ListGroup, Form, InputGroup } from "react-bootstrap";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { AuthContext } from "../security/AuthContext";
 import ToastComponent from "./ToastComponent";
-import { apicall_addQuantityForCartItem, apicall_addUserAddress, apicall_cancelOrder, apicall_createOrder, apicall_makePaymentForOrder, apicall_removeProductFromCart, apicall_removeQuantityForCartItem, apicall_retrieveAddressForUser, apicall_updateUserAddress, retrieveErrorMessage, retrieveMessage, showErrorMessage } from "../api/ApiCall";
+import { apicall_addProductToCart, apicall_addQuantityForCartItem, apicall_addUserAddress, apicall_cancelOrder, apicall_createOrder, apicall_makePaymentForOrder, apicall_removeProductFromCart, apicall_removeQuantityForCartItem, apicall_retrieveAddressForUser, apicall_retrieveProductByProductId, apicall_updateUserAddress, retrieveErrorMessage, retrieveMessage } from "../api/ApiCall";
 
 function CheckoutSummaryComponent() {
 
@@ -12,6 +12,10 @@ function CheckoutSummaryComponent() {
   const location = useLocation();
   const initialCartItems = location.state?.selectedItems || [];
 
+  const productQuantity = location.state?.quantity || null;
+
+  const { productExternalId } = useParams();
+
   const { isAdmin, userExternalId, isAuthenticated } = useContext(AuthContext);  
   const [isCheckOut, setIsCheckOut] = useState(false);
 
@@ -19,8 +23,19 @@ function CheckoutSummaryComponent() {
 
   const [addresses, setAddresses] = useState([]);
 
+  const initialAddress = {
+    orderReceiverName: "",
+    addressName: "",
+    addressLine: "",
+    city: "",
+    state: "",
+    pinCode: "",
+    country: "",
+    phoneNumber: ""
+  };
+
   const [cartItems, setCartItems] = useState(initialCartItems);
-  const [address, setAddress] = useState(null);
+  const [address, setAddress] = useState(initialAddress);
   
   useEffect(() => {
       if(!isAuthenticated){
@@ -34,8 +49,12 @@ function CheckoutSummaryComponent() {
           }
         } else {
           if(isFetchRequired)  {
-            if(cartItems.length > 0) {
+            setIsFetchRequired(false);
+            if(cartItems.length > 0 || (productQuantity != null && productExternalId != null)) {
               retrieveAddressForUser();
+              if(productQuantity != null && productExternalId != null) {
+                addProductToCart();
+              }
             }else{
               navigate('/user/cart');
             }
@@ -44,12 +63,6 @@ function CheckoutSummaryComponent() {
       }
   }, [isFetchRequired]);
 
-  useEffect(() => {
-    if(isCheckOut === true) {
-      navigate(`/user/orders/₹{orderExternalId}`);
-    }
-  },  [isCheckOut])
-
   const [isAddOrEditAddress, setIsAddOrEditAddress] = useState(false);
 
   const [showToast, setShowToast] = useState(false);
@@ -57,20 +70,35 @@ function CheckoutSummaryComponent() {
 
   const [toastType, setToastType] = useState("");
 
-  //const orderExternalId = "78468544";
-
   const [addressMode, setAddressMode] = useState(null);
 
-  const initialAddress = {
-    userName: "",
-    addressName: "",
-    addressLine: "",
-    city: "",
-    state: "",
-    pincode: "",
-    country: "",
-    phoneNumber: ""
-  };
+  const addProductToCart = async () => {
+    try {
+      const response = await apicall_retrieveProductByProductId(productExternalId);
+      if(response.data.success) {
+        const product = response.data.responseData;
+        const newCartItem = {
+          "productExternalId" : productExternalId,
+          "productName": product.productName,
+          "cartItemExternalId": null, 
+          "price": product.price,
+          "quantity": productQuantity,
+          "productStock": product.stock
+        }
+        setCartItems([...cartItems, newCartItem]);
+      }else {
+        setToastType("danger");
+        setToastMessage(retrieveMessage(response));
+        setShowToast(true);
+      }
+    } catch(error) {
+      setShowToast(true);
+      setToastType("danger");
+      setToastMessage(retrieveErrorMessage(error));
+    }
+  }
+
+ 
 
   const retrieveAddressForUser = async () => {
     try{
@@ -84,12 +112,11 @@ function CheckoutSummaryComponent() {
         setToastType("danger");
         setToastMessage(retrieveMessage(result));
       }
-      setIsFetchRequired(false);
     }catch(error) {
       setShowToast(true);
       setToastType("danger");
       setToastMessage(retrieveErrorMessage(error));
-      setIsFetchRequired(false);
+      
     }
   }
 
@@ -104,21 +131,6 @@ function CheckoutSummaryComponent() {
     setIsFetchRequired(true);
   };
 
-  // const updateQuantity = async (cartItemExternalId, mode) => {
-  //   try {
-  //     if(mode === "remove") {
-  //       await apicall_removeQuantityForCartItem(cartItemExternalId, {"quantity" : 1});
-  //     } else if (mode === "add") {
-  //       await apicall_addQuantityForCartItem(cartItemExternalId, {"quantity" : 1});
-  //     }
-  //     setIsFetchRequired(true);
-  //   } catch(error) {
-  //     ///setMessage(retrieveErrorMessage(error));
-  //     setIsFetchRequired(false);
-  //   }
-
-  // };
-
   const removeItem = (index) => {
     const updatedItems = cartItems.filter((_, i) => i !== index);
     setCartItems(updatedItems);
@@ -129,6 +141,8 @@ function CheckoutSummaryComponent() {
     setAddressMode(mode);
     if(mode === "add") {
       setAddress(initialAddress);
+    } else if (mode === "edit" && address) {
+      setAddress(address);
     }
   }
 
@@ -141,81 +155,77 @@ function CheckoutSummaryComponent() {
         } else if (addressMode === "edit") {
           await apicall_updateUserAddress(addressDto.addressExternalId, addressDto);
         }
-        setIsFetchRequired(true);
+        //setIsFetchRequired(true);
         setAddressMode(null);
         setIsAddOrEditAddress(false);
       } catch(error) {
         setShowToast(true);
         setToastType("danger");
         setToastMessage(retrieveErrorMessage(error));
-        setIsFetchRequired(false);
+        //setIsFetchRequired(false);
       }
     };
 
   const handleAddressChange = (e) => {
-    setAddress({ ...address, [e.target.name]: e.target.value });
+    const updatedAddress = { ...address, [e.target.name]: e.target.value };
+    setAddress(updatedAddress);
+    setAddresses(addresses.map(addr =>
+      addr.addressExternalId === updatedAddress.addressExternalId ? updatedAddress : addr
+    ));
   };
 
   const calculateTotal = () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2);
 
   const handlePayment = async () => {
-
+    if (!address || cartItems.length === 0) {
+      setShowToast(true);
+      setToastType("danger");
+      setToastMessage("Please select a valid address and ensure your cart is not empty.");
+      return;
+    } 
+    
+    if (
+      address.orderReceiverName == null ||
+      address.orderReceiverName.trim() == "" ||
+      address.phoneNumber == null ||
+      address.phoneNumber.trim() == ""
+    ) {      
+      setShowToast(true);
+      setToastType("danger");
+      setToastMessage("Please provide valid receiver name and phone number");
+      return; 
+    }
     try{
-
       const orderItems =  cartItems.map(({ productExternalId, quantity }) => ({
-                              productExternalId,
-                              quantity
-                            }));
-
+        productExternalId,
+        quantity
+      }));
       const orderRequestDto = {
         "totalAmount": calculateTotal(),
         "deductions": 0,
         "phoneNumber": address.phoneNumber,
         "deliveryAddressExternalId": address.addressExternalId,
         "userExternalId": userExternalId,
-        "orderItems": orderItems
+        "orderItems": orderItems,
+        "orderReceiverName": address.orderReceiverName
       };
-
-      //console.log(orderRequestDto);
-
       const response_createOrder = await apicall_createOrder(userExternalId, orderRequestDto);
-
-      if(!response_createOrder.data.sucess) {
+      if(!response_createOrder.data.success) {
         setShowToast(true);
         setToastMessage(retrieveMessage(response_createOrder));
         setToastType("danger");
+        setTimeout(() => {
+          navigate('/user/cart')
+        }, 1000);
+        return;
       }
-
       const orderExternalId = response_createOrder.data.responseData.orderExternalId;
-
-      // const paymentDTO = {};
-
-      // const response_makePayment = await apicall_makePaymentForOrder(orderExternalId, paymentDTO);
-
-      // if(!response_makePayment) {
-      //   const deleteOrderResponse = await apicall_cancelOrder(orderExternalId);
-      //   setShowToast(true);
-      //   setToastMessage(retrieveMessage(response_createOrder));
-      //   setToastType("danger");
-      // }
-
-      // cartItems.map(async (item) => {
-      //   const result = await apicall_removeProductFromCart(item.cartItemExternalId);
-      //   if(!result.data.sucess) {
-      //     setShowToast(true);
-      //     setToastMessage(retrieveMessage(result));
-      //     setToastType("danger");
-      //   }
-      // });
-
       setShowToast(true);
       setToastMessage("Payment successful!!");
       setToastType("success");
-
       setTimeout(() => {
         navigate(`/user/order/${orderExternalId}/payment/confirmation`,  { state: { cartItems } })
       }, 1000);
-
     }catch(error){
       setShowToast(true);
       setToastMessage(retrieveErrorMessage(error));
@@ -243,9 +253,9 @@ function CheckoutSummaryComponent() {
                       onChange={() => handleSelect(addr)}
                       label={
                         <div>
-                          <strong>Delivered To: </strong> {addr.userName}<br />
+                          <strong>Delivered To: </strong> {addr.orderReceiverName}<br />
                           <strong>Address: {addr.addressName}</strong><br />
-                          {addr.addressLine}, {addr.city}, {addr.state}, {addr.pincode}, {addr.country}<br />
+                          {addr.addressLine}, {addr.city}, {addr.state}, {addr.pinCode}, {addr.country}<br />
                           <strong>Phone:</strong> {addr.phoneNumber}
                         </div>
                       }
@@ -254,40 +264,44 @@ function CheckoutSummaryComponent() {
                 </Card>
               ))}
             </Card.Body>}
-            {isAddOrEditAddress && 
+            
             <Card.Body>
               <Form>
                 <Form.Group className="mb-2">
-                  <Form.Label>Receiver Name</Form.Label>
-                  <Form.Control type="text" name="userName" value={address.userName} onChange={handleAddressChange} />
+                  <Form.Label>Order delivered to: </Form.Label>
+                  <Form.Control type="text" name="orderReceiverName" value={address.orderReceiverName} onChange={handleAddressChange}/>
                 </Form.Group>
+                {isAddOrEditAddress && 
+                <>
+                  <Form.Group className="mb-2">
+                    <Form.Label>Street</Form.Label>
+                    <Form.Control type="text" name="addressLine" value={address.addressLine} onChange={handleAddressChange}  />
+                  </Form.Group>
+                  <Form.Group className="mb-2">
+                    <Form.Label>City</Form.Label>
+                    <Form.Control type="text" name="city" value={address.city} onChange={handleAddressChange} />
+                  </Form.Group>
+                  <Form.Group className="mb-2">
+                    <Form.Label>State</Form.Label>
+                    <Form.Control type="text" name="state" value={address.state} onChange={handleAddressChange} />
+                  </Form.Group>
+                  <Form.Group className="mb-2">
+                    <Form.Label>ZIP Code</Form.Label>
+                    <Form.Control type="text" name="pinCode" value={address.pinCode} onChange={handleAddressChange} />
+                  </Form.Group>
+                  <Form.Group className="mb-2">
+                    <Form.Label>Country</Form.Label>
+                    <Form.Control type="text" name="country" value={address.country} onChange={handleAddressChange} />
+                  </Form.Group>
+                </>
+                }
                 <Form.Group className="mb-2">
-                  <Form.Label>Street</Form.Label>
-                  <Form.Control type="text" name="addressLine" value={address.addressLine} onChange={handleAddressChange} />
-                </Form.Group>
-                <Form.Group className="mb-2">
-                  <Form.Label>City</Form.Label>
-                  <Form.Control type="text" name="city" value={address.city} onChange={handleAddressChange} />
-                </Form.Group>
-                <Form.Group className="mb-2">
-                  <Form.Label>State</Form.Label>
-                  <Form.Control type="text" name="state" value={address.state} onChange={handleAddressChange} />
-                </Form.Group>
-                <Form.Group className="mb-2">
-                  <Form.Label>ZIP Code</Form.Label>
-                  <Form.Control type="text" name="pincode" value={address.pincode} onChange={handleAddressChange} />
-                </Form.Group>
-                <Form.Group className="mb-2">
-                  <Form.Label>Country</Form.Label>
-                  <Form.Control type="text" name="country" value={address.country} onChange={handleAddressChange} />
-                </Form.Group>
-                <Form.Group className="mb-2">
-                  <Form.Label>Phone</Form.Label>
+                  <Form.Label>Receiver's Phone: </Form.Label>
                   <Form.Control type="text" name="phoneNumber" value={address.phoneNumber} onChange={handleAddressChange} />
                 </Form.Group>
-                <Button variant="warning" onClick={() => handleAddOrEditAddressSave(addressMode)}>Done</Button>
+                {isAddOrEditAddress && <Button variant="warning" onClick={() => handleAddOrEditAddressSave(addressMode)}>Done</Button>}
               </Form>
-            </Card.Body>}
+            </Card.Body>
             {!isAddOrEditAddress && 
             <Card.Footer className="d-flex gap-2">
               <Button variant="primary" onClick={() => handleAddOrEditAddress("add")}>Add Address</Button>

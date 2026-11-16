@@ -1,5 +1,5 @@
-import { createContext, useState } from "react";
-import { apicall_loginuser, apicall_registerUser, retrieveErrorMessage, retrieveMessage } from "../api/ApiCall";
+import { createContext, useCallback, useEffect, useState } from "react";
+import { apicall_loginuser, apicall_logout, apicall_registerUser, apicall_retrieveCsrfToken, apicall_retrieveSession, retrieveErrorMessage, retrieveMessage } from "../api/ApiCall";
 
 export const AuthContext = createContext();
 
@@ -7,26 +7,58 @@ function AuthProvider({ children }){
 
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
-
     const [userExternalId, setUserExternalId] = useState(null);
+    const [isAuthLoading, setIsAuthLoading] = useState(true);
+    const [authLoadError, setAuthLoadError] = useState(null);
 
-    //const [errorMessage, setErrorMessage] = useState("");
+    useEffect(() => {
+        let isMounted = true;
 
-    function onLogout() {
+        apicall_retrieveCsrfToken()
+            .then(() => apicall_retrieveSession())
+            .then(response => {
+                if (!isMounted) return;
+                const session = response.data.responseData;
+                setIsAuthenticated(true);
+                setIsAdmin(session.role === "ADMIN");
+                setUserExternalId(session.userExternalId || null);
+            })
+            .catch(error => {
+                if (!isMounted) return;
+                if (error.response?.status !== 401) {
+                    setAuthLoadError(retrieveErrorMessage(error));
+                }
+            })
+            .finally(() => {
+                if (isMounted) setIsAuthLoading(false);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    const onLogout = useCallback(async () => {
+        await apicall_logout();
         setIsAuthenticated(false);
         setIsAdmin(false);
-    }
+        setUserExternalId(null);
+        setAuthLoadError(null);
+    }, []);
 
     const signUp = async (userRequestDTO) => {
         try {
             const response = await apicall_registerUser(userRequestDTO);
 
             if(response.data.success) {
+                setIsAuthLoading(false);
+                setAuthLoadError(null);
                 setIsAuthenticated(true);
                 setIsAdmin(false);
                 setUserExternalId(response?.data?.responseData?.userExternalId);
                 return { success: true };
             } else {
+                setIsAuthLoading(false);
                 setIsAuthenticated(false);
                 setIsAdmin(false);
                 setUserExternalId(null);
@@ -34,6 +66,7 @@ function AuthProvider({ children }){
             }
 
         } catch (error) {
+            setIsAuthLoading(false);
             setIsAuthenticated(false);
             setIsAdmin(false);
             setUserExternalId(null);
@@ -43,57 +76,46 @@ function AuthProvider({ children }){
     };
 
     const login = async (userRequestDTO) => {
-        if (userRequestDTO.emailId === "admin@gmail.com" && userRequestDTO.password === "Passw0rd-admin") {
-            setIsAuthenticated(true);
-            setIsAdmin(true);
-            setUserExternalId(null);
-            return { success: true };
-        } else {
-            try {
-                const response = await apicall_loginuser(userRequestDTO);
+        try {
+            const response = await apicall_loginuser(userRequestDTO);
 
-                if(response.data.success) {
-                    setIsAuthenticated(true);
-                    setIsAdmin(false);
-                    setUserExternalId(response.data.responseData.userExternalId);
-                    return { success: true };
-                } else {
-                    setIsAuthenticated(false);
-                    setIsAdmin(false);
-                    setUserExternalId(null);
-
-                    return { success: false, errorMessage: retrieveMessage(response) };
-                }
-                
-            } catch (error) {
+            if(response.data.success) {
+                const session = response.data.responseData;
+                setIsAuthLoading(false);
+                setAuthLoadError(null);
+                setIsAuthenticated(true);
+                setIsAdmin(session.role === "ADMIN");
+                setUserExternalId(session.userExternalId || null);
+                return { success: true };
+            } else {
+                setIsAuthLoading(false);
                 setIsAuthenticated(false);
                 setIsAdmin(false);
                 setUserExternalId(null);
 
-                return { success: false, errorMessage: retrieveErrorMessage(error) };
+                return { success: false, errorMessage: retrieveMessage(response) };
             }
-        }
-         
-    }
-
-    function isLoggedIn(email, password) {
-        if(email === "siman.parveen29@gmail.com" && password === "Passw0rd") {
-            setIsAuthenticated(true);
-            setIsAdmin(false);
-            return true;
-        } else if (email === "admin@gmail.com" && password === "Passw0rd-admin") {
-            setIsAuthenticated(true);
-            setIsAdmin(true);
-            return true;
-        } else {
+        } catch (error) {
+            setIsAuthLoading(false);
             setIsAuthenticated(false);
             setIsAdmin(false);
-            return false;
+            setUserExternalId(null);
+
+            return { success: false, errorMessage: retrieveErrorMessage(error) };
         }
     }
 
     return (
-        <AuthContext.Provider value={ {isAuthenticated, isAdmin, login, onLogout, signUp, userExternalId} }>
+        <AuthContext.Provider value={ {
+            isAuthenticated,
+            isAdmin,
+            isAuthLoading,
+            authLoadError,
+            login,
+            onLogout,
+            signUp,
+            userExternalId
+        } }>
             {children}
         </AuthContext.Provider>
     )

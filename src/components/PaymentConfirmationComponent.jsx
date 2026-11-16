@@ -1,13 +1,15 @@
-import React, { useContext, useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useContext, useEffect, useState } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Container, Card, Button, ListGroup, Table, Row, Col } from "react-bootstrap";
-import { apicall_deleteOrder, apicall_getOrderDetails, apicall_makePaymentForOrder, apicall_removeProductFromCart, retrieveErrorMessage, retrieveMessage } from "../api/ApiCall";
+import { apicall_deleteOrder, apicall_makePaymentForOrder, apicall_removeProductFromCart, apicall_retrieveOrderByOrderExternalId, retrieveErrorMessage, retrieveMessage } from "../api/ApiCall";
 import ToastComponent from "./ToastComponent";
 import { AuthContext } from "../security/AuthContext";
 
 function PaymentConfirmationPage() {
 
-    const { isAuthenticated } = useContext(AuthContext);  
+    const { isAdmin, isAuthenticated } = useContext(AuthContext); 
+    
+    const location = useLocation();
 
     const cartItems = location.state?.cartItems || [];
 
@@ -48,7 +50,7 @@ function PaymentConfirmationPage() {
 
     const fetchOrderDetails = async () => { 
         try {
-            const response = await apicall_getOrderDetails(orderExternalId);
+            const response = await apicall_retrieveOrderByOrderExternalId(orderExternalId);
             if (response.data.success) {
                 setOrderDetails(response.data.responseData);
                 createNewTransactionId();
@@ -96,29 +98,31 @@ function PaymentConfirmationPage() {
                 const deleteOrderResponse = await apicall_deleteOrder(orderExternalId);
                 if(!deleteOrderResponse.data.success){
                     setShowToast(true);
-                    setToastMessage(retrieveMessage(response_createOrder));
+                    setToastMessage(retrieveMessage(deleteOrderResponse));
                     setToastType("danger");
                 }
                 setShowToast(true);
-                setToastMessage(retrieveMessage(response_createOrder));
+                setToastMessage(retrieveMessage(response_makePayment));
                 setToastType("danger");
             }
 
-            cartItems.foreach(async (item) => {
-                const result = await apicall_removeProductFromCart(item.cartItemExternalId);
-                if(!result.data.sucess) {
-                    setShowToast(true);
-                    setToastMessage(retrieveMessage(result));
-                    setToastType("danger");
-                }
-            });
+            await Promise.all(
+                cartItems.map(async (item) => {
+                    const result = await apicall_removeProductFromCart(item.cartItemExternalId);
+                    if(!result.data.success) {
+                        setShowToast(true);
+                        setToastMessage(retrieveMessage(result));
+                        setToastType("danger");
+                    }
+                })
+            );
 
             setShowToast(true);
-            setToastMessage("Payment successful!!");
+            setToastMessage("Payment successful!! Please wait while we redirect you to order details page...");
             setToastType("success");
 
             setTimeout(() => {
-                navigate(`/user/order/${orderExternalId}/payment/confirmation`)
+                navigate(`/order/${orderExternalId}/payment/details`)
             }, 1000);
 
         }catch(error){
@@ -134,7 +138,7 @@ function PaymentConfirmationPage() {
             const deleteOrderResponse = await apicall_deleteOrder(orderExternalId);
             if(!deleteOrderResponse.data.success){
                 setShowToast(true);
-                setToastMessage(retrieveMessage(response_createOrder));
+                setToastMessage(retrieveMessage(deleteOrderResponse));
                 setToastType("danger");
             }
         }catch(error) {
@@ -142,18 +146,10 @@ function PaymentConfirmationPage() {
             setToastMessage(retrieveErrorMessage(error));
             setToastType("danger");
         } finally {
-            setIsLoading(false);
+           // setIsLoading(false);
         }
     };
 
-    if (isLoading) {
-        return (
-            <Container className="text-center my-5">
-                <Spinner animation="border" variant="primary" />
-                <div className="mt-3">Processing, please wait...</div>
-            </Container>
-        );
-    }
     if (!orderDetails) {
         return (
             <Container className="text-center my-5">
@@ -182,17 +178,17 @@ function PaymentConfirmationPage() {
                                     <strong>Transaction ID:</strong> <span className="text-success">{transactionId}</span>
                                 </ListGroup.Item>
                                 <ListGroup.Item>
-                                    <strong>Total Amount Paid:</strong> <span className="text-danger">₹ {orderDetails.totalAmount.toFixed(2)}</span>
+                                    <strong>Total Amount Paid:</strong> <span className="text-danger">₹ {orderDetails.totalCost?.toFixed(2)}</span>
                                 </ListGroup.Item>
                                 <ListGroup.Item>
                                     <strong>Delivery Address:</strong>
                                     <div className="mt-1">
-                                        <span className="fw-light">{orderDetails.deliveryAddress.addressLine}, {orderDetails.deliveryAddress.city}, {orderDetails.deliveryAddress.state}, {orderDetails.deliveryAddress.pincode}, {orderDetails.deliveryAddress.country}</span>
+                                        <span className="fw-light">{orderDetails.address?.addressLine}, {orderDetails.address?.city}, {orderDetails.address?.state}, {orderDetails.address?.pinCode}, {orderDetails.address?.country}</span>
                                     </div>
                                 </ListGroup.Item>
-                                <ListGroup.Item>
+                                {/* <ListGroup.Item>
                                     <strong>Phone:</strong> <span className="fw-light">{orderDetails.phoneNumber}</span>
-                                </ListGroup.Item>
+                                </ListGroup.Item> */}
                                 <ListGroup.Item>
                                     <strong>Ordered Items:</strong>
                                     <Table hover size="sm" borderless className="mt-2">
@@ -201,7 +197,7 @@ function PaymentConfirmationPage() {
                                                 <th>Product Name</th>
                                                 <th>Quantity</th>
                                                 <th>Price (₹)</th>
-                                                <th>Delivery Date</th>
+                                                <th>Expected Delivery Date</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -209,7 +205,7 @@ function PaymentConfirmationPage() {
                                                 <tr key={item.productExternalId}>
                                                     <td>{item.productName}</td>
                                                     <td>{item.quantity}</td>
-                                                    <td>{(item.productPrice * item.quantity).toFixed(2)}</td>
+                                                    <td>{(item.productPrice * item.quantity)?.toFixed(2)}</td>
                                                     <td>{item.deliveredDate}</td>
                                                 </tr>
                                             ))}
